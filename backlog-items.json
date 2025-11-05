@@ -1,0 +1,397 @@
+{
+  "project": "Työajanseuranta-GO",
+  "version": "0.1",
+  "backlog": [
+    {
+      "id": "INIT-000",
+      "title": "[INIT-000] Repository skeleton & wiring",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["core", "scaffold"],
+      "description": "Create cmd/server, internal/* folders; wire router, config, logger.",
+      "acceptance_criteria": [
+        "Project builds and starts main.go",
+        "Health endpoint returns 200"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "DOMAIN-001",
+      "title": "[DOMAIN-001] Domain models: User, TimeEntry",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["domain", "models"],
+      "description": "Define User(role ∈ {EMPLOYEE, MANAGER}), TimeEntry fields.",
+      "acceptance_criteria": [
+        "Go structs for User and TimeEntry exist",
+        "JSON tags and basic validation present"
+      ],
+      "depends_on": ["INIT-000"]
+    },
+    {
+      "id": "DB-001",
+      "title": "[DB-001] Initialize GORM with SQLite",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["database", "gorm", "sqlite"],
+      "description": "Create DB connection helper and repository layer using GORM.",
+      "acceptance_criteria": [
+        "DB opens using config path",
+        "GORM log level configurable"
+      ],
+      "depends_on": ["DOMAIN-001"]
+    },
+    {
+      "id": "DB-002",
+      "title": "[DB-002] Migrations & seed admin",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["database", "migrations", "seed"],
+      "description": "Auto-migrate tables and seed initial admin user.",
+      "acceptance_criteria": [
+        "Auto-migrate runs at startup or via make migrate",
+        "Admin seeded with hashed password"
+      ],
+      "depends_on": ["DB-001"]
+    },
+    {
+      "id": "AUTH-001",
+      "title": "[AUTH-001] Password hashing (bcrypt)",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["auth", "security"],
+      "description": "Introduce bcrypt hashing & verification helpers.",
+      "acceptance_criteria": [
+        "New users stored with bcrypt hash",
+        "Password verify returns correct boolean"
+      ],
+      "depends_on": ["DOMAIN-001"]
+    },
+    {
+      "id": "AUTH-002",
+      "title": "[AUTH-002] JWT generation & validation",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["auth", "jwt", "security"],
+      "description": "Issue/validate JWTs with exp/iat/sub/role claims.",
+      "acceptance_criteria": [
+        "Signed JWT returned on successful login",
+        "Invalid/expired tokens rejected with 401"
+      ],
+      "depends_on": ["AUTH-001"]
+    },
+    {
+      "id": "AUTH-003",
+      "title": "[AUTH-003] RBAC middleware (EMPLOYEE, MANAGER)",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["auth", "rbac"],
+      "description": "Middleware to enforce role-based access control.",
+      "acceptance_criteria": [
+        "Manager-only routes return 403 to non-managers",
+        "Employee routes scoped to authenticated user"
+      ],
+      "depends_on": ["AUTH-002"]
+    },
+    {
+      "id": "API-CORE-001",
+      "title": "[API-CORE-001] Error format & handler",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["api", "errors"],
+      "description": "Global error handler returning {\"error\":\"...\",\"code\":\"...\"}.",
+      "acceptance_criteria": [
+        "All handlers use unified error responses",
+        "Validation errors returned as list"
+      ],
+      "depends_on": ["INIT-000"]
+    },
+    {
+      "id": "API-CORE-002",
+      "title": "[API-CORE-002] Request logging & request-id",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["api", "logging"],
+      "description": "Middleware adds request-id; logs method, path, status, latency.",
+      "acceptance_criteria": [
+        "Request-id present in logs and response header",
+        "Structured logs for each request"
+      ],
+      "depends_on": ["INIT-000"]
+    },
+    {
+      "id": "API-AUTH-001",
+      "title": "[API-AUTH-001] POST /api/v1/auth/login",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["api", "auth"],
+      "description": "Login with email+password; return JWT on success.",
+      "acceptance_criteria": [
+        "200 with JWT on valid creds",
+        "401 on invalid creds",
+        "Rate-limit friendly structure"
+      ],
+      "depends_on": ["AUTH-002", "API-CORE-001"]
+    },
+    {
+      "id": "API-AUTH-002",
+      "title": "[API-AUTH-002] GET /api/v1/auth/me",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["api", "auth"],
+      "description": "Return the currently authenticated user profile.",
+      "acceptance_criteria": [
+        "200 with user id/email/role",
+        "401 without/invalid token"
+      ],
+      "depends_on": ["AUTH-002"]
+    },
+    {
+      "id": "API-ME-001",
+      "title": "[API-ME-001] GET /api/v1/me/time-entries?from=&to=",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["api", "time-entries"],
+      "description": "List own time entries with date filtering.",
+      "acceptance_criteria": [
+        "200 returns only caller’s entries",
+        "Supports from/to filtering"
+      ],
+      "depends_on": ["AUTH-003", "DB-001"]
+    },
+    {
+      "id": "API-ME-002",
+      "title": "[API-ME-002] POST /api/v1/me/time-entries",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["api", "time-entries", "create"],
+      "description": "Create a new time entry for the caller.",
+      "acceptance_criteria": [
+        "201 with created entry",
+        "Validates date/start/end/duration"
+      ],
+      "depends_on": ["API-ME-001"]
+    },
+    {
+      "id": "API-ME-003",
+      "title": "[API-ME-003] PATCH /api/v1/me/time-entries/{id}",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["api", "time-entries", "update"],
+      "description": "Update caller’s own time entry fields.",
+      "acceptance_criteria": [
+        "200 with updated fields",
+        "403 when editing others’ entries"
+      ],
+      "depends_on": ["API-ME-001"]
+    },
+    {
+      "id": "API-ME-004",
+      "title": "[API-ME-004] DELETE /api/v1/me/time-entries/{id}",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["api", "time-entries", "delete"],
+      "description": "Delete caller’s own time entry.",
+      "acceptance_criteria": [
+        "204 on success",
+        "404 if not found or not owned by caller"
+      ],
+      "depends_on": ["API-ME-001"]
+    },
+    {
+      "id": "API-MGR-001",
+      "title": "[API-MGR-001] GET /api/v1/users (MANAGER)",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["api", "users", "manager"],
+      "description": "List users for manager reporting screens.",
+      "acceptance_criteria": [
+        "200 with user list",
+        "403 for non-managers"
+      ],
+      "depends_on": ["AUTH-003"]
+    },
+    {
+      "id": "API-MGR-002",
+      "title": "[API-MGR-002] GET /api/v1/time-entries?user_id=&from=&to=",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["api", "time-entries", "manager"],
+      "description": "Manager can query any user’s entries with filters.",
+      "acceptance_criteria": [
+        "200 with filtered results",
+        "403 for non-managers"
+      ],
+      "depends_on": ["API-MGR-001", "DB-001"]
+    },
+    {
+      "id": "API-REPORTS-001",
+      "title": "[API-REPORTS-001] GET /api/v1/reports/summary?from=&to=",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["api", "reports"],
+      "description": "Aggregated summaries for reporting periods.",
+      "acceptance_criteria": [
+        "200 with totals by user/date",
+        "Filters by date range"
+      ],
+      "depends_on": ["API-MGR-002"]
+    },
+    {
+      "id": "SERVICE-001",
+      "title": "[SERVICE-001] Business rules in services layer",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["services", "business-logic"],
+      "description": "Encapsulate use cases (create/list/update/delete entries).",
+      "acceptance_criteria": [
+        "Handlers call services (no DB in handlers)",
+        "RBAC checked in services or middleware"
+      ],
+      "depends_on": ["DB-001", "DOMAIN-001"]
+    },
+    {
+      "id": "REPO-001",
+      "title": "[REPO-001] Repository implementations (User, TimeEntry)",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["repository", "gorm"],
+      "description": "CRUD with transactions; filter by date range and user.",
+      "acceptance_criteria": [
+        "Interfaces defined and implemented",
+        "Unit tests with sqlite/in-memory"
+      ],
+      "depends_on": ["DB-001"]
+    },
+    {
+      "id": "SEC-LOG-001",
+      "title": "[SEC-LOG-001] Audit trail (who edited entries)",
+      "status": "Backlog",
+      "estimate": 2,
+      "labels": ["security", "audit"],
+      "description": "Track user id and timestamps on create/update.",
+      "acceptance_criteria": [
+        "created_at/updated_at set automatically",
+        "editor identity recorded"
+      ],
+      "depends_on": ["REPO-001"]
+    },
+    {
+      "id": "CONFIG-001",
+      "title": "[CONFIG-001] Configuration via env/flags",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["config"],
+      "description": "Load JWT secret, DB path, log level from env/flags.",
+      "acceptance_criteria": [
+        ".env supported with defaults",
+        "Fails fast if critical values missing"
+      ],
+      "depends_on": ["INIT-000"]
+    },
+    {
+      "id": "VALIDATION-001",
+      "title": "[VALIDATION-001] Request DTOs & validation",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["api", "validation"],
+      "description": "DTOs for login and time entry create/update with validation.",
+      "acceptance_criteria": [
+        "Invalid payload returns 400 with details",
+        "DTOs mapped cleanly to domain"
+      ],
+      "depends_on": ["API-CORE-001"]
+    },
+    {
+      "id": "TEST-UNIT-001",
+      "title": "[TEST-UNIT-001] Unit tests for services",
+      "status": "Backlog",
+      "estimate": 3,
+      "labels": ["tests", "unit"],
+      "description": "Cover core business rules, auth helpers.",
+      "acceptance_criteria": [
+        "≥70% coverage on services/auth utils",
+        "All tests pass locally"
+      ],
+      "depends_on": ["SERVICE-001", "AUTH-002"]
+    },
+    {
+      "id": "TEST-INTEG-001",
+      "title": "[TEST-INTEG-001] Integration tests for repositories",
+      "status": "Backlog",
+      "estimate": 3,
+      "labels": ["tests", "integration", "database"],
+      "description": "Run against sqlite (in-memory or temp file).",
+      "acceptance_criteria": [
+        "CRUD & filter tests pass",
+        "Transactional behavior verified"
+      ],
+      "depends_on": ["REPO-001"]
+    },
+    {
+      "id": "DOCS-OPENAPI-001",
+      "title": "[DOCS-OPENAPI-001] Generate OpenAPI (openapi.yaml)",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["docs", "openapi"],
+      "description": "Document all v1 endpoints, request/response & error model.",
+      "acceptance_criteria": [
+        "openapi.yaml checked into /docs",
+        "Examples cover auth and filters"
+      ],
+      "depends_on": ["API-AUTH-002", "API-ME-004", "API-MGR-002", "API-REPORTS-001"]
+    },
+    {
+      "id": "DOCS-README-001",
+      "title": "[DOCS-README-001] README with setup/run",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["docs"],
+      "description": "Install, run, test, and sample curl/Postman calls.",
+      "acceptance_criteria": [
+        "Local quickstart works",
+        "Sample requests return expected results"
+      ],
+      "depends_on": ["INIT-000"]
+    },
+    {
+      "id": "DOCS-ARCH-001",
+      "title": "[DOCS-ARCH-001] Architecture diagram",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["docs", "architecture"],
+      "description": "Diagram of layers: API (Gin) → Services → Repos (GORM) → SQLite.",
+      "acceptance_criteria": [
+        "Image committed under /docs",
+        "Mentions middleware (auth, logging)"
+      ],
+      "depends_on": ["INIT-000"]
+    },
+    {
+      "id": "SCRIPTS-001",
+      "title": "[SCRIPTS-001] Makefile targets (run/test/lint/migrate)",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["devex", "makefile"],
+      "description": "Add developer ergonomics via make targets.",
+      "acceptance_criteria": [
+        "`make run` starts server",
+        "`make test` runs unit+integration"
+      ],
+      "depends_on": ["INIT-000"]
+    },
+    {
+      "id": "BUILD-001",
+      "title": "[BUILD-001] cmd/server bootstrap (DI wiring)",
+      "status": "Backlog",
+      "estimate": 1,
+      "labels": ["build", "bootstrap"],
+      "description": "Wire config, DB, repos, services, router, middleware.",
+      "acceptance_criteria": [
+        "Server starts with all middlewares",
+        "Clean shutdown on SIGINT"
+      ],
+      "depends_on": ["CONFIG-001", "DB-001", "SERVICE-001", "API-CORE-002"]
+    }
+  ]
+}
