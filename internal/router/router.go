@@ -32,9 +32,11 @@ func (r *Router) setupRoutes() {
 func (r *Router) healthHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status": "ok",
-	})
+	}); err != nil {
+		r.logger.Error("Failed to encode health response: " + err.Error())
+	}
 }
 
 // ServeHTTP implements http.Handler interface

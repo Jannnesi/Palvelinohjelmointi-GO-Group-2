@@ -11,6 +11,7 @@ type Logger struct {
 }
 
 // New creates a new logger instance
+// Note: level parameter is reserved for future log level filtering
 func New(level string) *Logger {
 	return &Logger{
 		Logger: log.New(os.Stdout, "", log.LstdFlags),
