@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/config"
+	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/database"
 	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/logger"
 	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/router"
 )
@@ -17,8 +18,11 @@ func main() {
 	log := logger.New(cfg.LogLevel)
 	log.Info("Starting server...")
 
+	// Connect to SQLite database
+	db := database.Connect()
+
 	// Create router
-	r := router.New(log)
+	r := router.New(log, db)
 
 	// Start server
 	addr := fmt.Sprintf(":%s", cfg.ServerPort)
