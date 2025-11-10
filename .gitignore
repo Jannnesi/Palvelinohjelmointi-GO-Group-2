@@ -8,6 +8,10 @@
 *.so
 *.dylib
 
+go.mod
+go.sum
+worklogger.db
+
 # Test binary, built with `go test -c`
 *.test
 
