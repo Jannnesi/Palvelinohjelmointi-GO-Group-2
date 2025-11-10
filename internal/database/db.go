@@ -1,12 +1,12 @@
 package database
 
 import (
-	"log"
-	"time"
+    "log"
+    "time"
 
-	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/domain"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+    "github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/domain"
+    "github.com/glebarez/sqlite"
+    "gorm.io/gorm"
 )
 
 // Connect opens a SQLite database and performs auto migration
