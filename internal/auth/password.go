@@ -1,3 +1,4 @@
+// Package auth provides authentication utilities including password hashing
 package auth
 
 import (
