@@ -33,22 +33,12 @@ func (r *Router) setupRoutes() {
 	r.mux.HandleFunc("/", r.rootHandler)
 	r.mux.HandleFunc("/health", r.healthHandler)
 	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler)
+	r.mux.HandleFunc("/api/v1/login", r.loginHandler)
 }
 
 // rootHandler lists all available API endpoints
 func (r *Router) rootHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	endpoints := map[string]string{
-		"GET /":            "List all available API endpoints",
-		"GET /health":      "Check service health",
-		"GET /timeentries": "Get all time entries",
-	}
-
-	if err := json.NewEncoder(w).Encode(endpoints); err != nil {
-		r.logger.Error("Failed to encode endpoints response: " + err.Error())
-	}
+	http.ServeFile(w, req, "./frontend/index.html")
 }
 
 // healthHandler handles health check requests
@@ -76,6 +66,36 @@ func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		r.logger.Error("JSON encode error: " + err.Error())
 	}
+}
+
+func (r *Router) loginHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var payload struct {
+		Role string `json:"role"`
+	}
+
+	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Only accept "worker" or "manager"
+	if payload.Role != "worker" && payload.Role != "manager" {
+		http.Error(w, "Invalid role", http.StatusBadRequest)
+		return
+	}
+
+	// Respond with success and role (for now no password/auth)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"role":    payload.Role,
+	})
 }
 
 // ServeHTTP implements http.Handler interface

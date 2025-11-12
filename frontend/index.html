@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+    button { padding: 15px 30px; margin: 20px; font-size: 18px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Welcome to the Time Tracker</h1>
+  <button id="workerBtn">Login as Worker</button>
+  <button id="managerBtn">Login as Manager</button>
+
+  <script>
+    const workerBtn = document.getElementById("workerBtn");
+    const managerBtn = document.getElementById("managerBtn");
+
+    workerBtn.addEventListener("click", () => login("worker"));
+    managerBtn.addEventListener("click", () => login("manager"));
+
+    function login(role) {
+      // Example: send a POST request to backend login endpoint
+      fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.success){
+          alert(`Logged in as ${role}`);
+          // Redirect to dashboard or show role-specific content
+        } else {
+          alert("Login failed");
+        }
+      })
+      .catch(err => console.error("Login error:", err));
+    }
+  </script>
+</body>
+</html>
