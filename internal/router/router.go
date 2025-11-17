@@ -31,13 +31,19 @@ func New(log *logger.Logger, db *gorm.DB) *Router {
 // setupRoutes configures all application routes
 func (r *Router) setupRoutes() {
 	// API routes first
-	r.mux.HandleFunc("/login", r.loginHandler)
+	r.mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		http.ServeFile(w, req, "./frontend/index.html")
+	})
+
 	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler)
 	r.mux.HandleFunc("/health", r.healthHandler)
+	r.mux.HandleFunc("/workerdashboard", r.workerdashboardHandler)
 
-	// Static frontend routes after API
+	// Serve static HTML from frontend/
 	fs := http.FileServer(http.Dir("./frontend"))
-	r.mux.Handle("/", fs)
+	r.mux.Handle("/frontend/", http.StripPrefix("/frontend/", fs))
+
+	r.mux.HandleFunc("/login", r.loginHandler)
 }
 
 // healthHandler handles health check requests
@@ -49,6 +55,10 @@ func (r *Router) healthHandler(w http.ResponseWriter, req *http.Request) {
 	}); err != nil {
 		r.logger.Error("Failed to encode health response: " + err.Error())
 	}
+}
+
+func (r *Router) workerdashboardHandler(w http.ResponseWriter, req *http.Request) {
+	http.ServeFile(w, req, "frontend/workerdashboard.html")
 }
 
 func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
