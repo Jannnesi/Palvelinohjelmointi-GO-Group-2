@@ -14,30 +14,28 @@
   <button id="managerBtn">Login as Manager</button>
 
   <script>
-    const workerBtn = document.getElementById("workerBtn");
-    const managerBtn = document.getElementById("managerBtn");
 
-    workerBtn.addEventListener("click", () => login("worker"));
-    managerBtn.addEventListener("click", () => login("manager"));
-
-    function login(role) {
-      // Example: send a POST request to backend login endpoint
-      fetch("/login", {
+    async function login(role) {
+      const res = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if(data.success){
-          alert(`Logged in as ${role}`);
-          // Redirect to dashboard or show role-specific content
-        } else {
-          alert("Login failed");
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        if (role === "worker") {
+          window.location.href = "/fronted/workerdashboard.html";
+        } else if (role === "manager") {
+          window.location.href = "/managerdashboard.html";
         }
-      })
-      .catch(err => console.error("Login error:", err));
+      } else {
+        alert("Login failed");
+      }
     }
+
+    document.getElementById("workerBtn").addEventListener("click", () => login("worker"));
+    document.getElementById("managerBtn").addEventListener("click", () => login("manager"));
   </script>
 </body>
 </html>

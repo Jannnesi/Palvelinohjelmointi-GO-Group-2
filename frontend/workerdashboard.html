@@ -1,0 +1,40 @@
+<h1>Worker Dashboard</h1>
+
+<form id="entryForm">
+  <input type="text" id="task" placeholder="Task description" required>
+  <input type="number" id="hours" step="0.25" placeholder="Hours worked" required>
+  <button type="submit">Add Entry</button>
+</form>
+
+<div id="entries"></div>
+
+<script>
+async function loadEntries() {
+  const res = await fetch("/timeentries");
+  const entries = await res.json();
+  document.getElementById("entries").innerHTML =
+    entries.map(e => `<div>${e.task} - ${e.hours}h</div>`).join("");
+}
+
+document.getElementById("entryForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const task = document.getElementById("task").value;
+  const hours = parseFloat(document.getElementById("hours").value);
+
+  const res = await fetch("/timeentries", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task, hours })
+  });
+
+  if (res.ok) {
+    alert("Time entry added!");
+    loadEntries();
+    e.target.reset();
+  } else {
+    alert("Failed to add entry");
+  }
+});
+
+loadEntries();
+</script>

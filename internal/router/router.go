@@ -30,15 +30,14 @@ func New(log *logger.Logger, db *gorm.DB) *Router {
 
 // setupRoutes configures all application routes
 func (r *Router) setupRoutes() {
-	r.mux.HandleFunc("/", r.rootHandler)
-	r.mux.HandleFunc("/health", r.healthHandler)
+	// API routes first
+	r.mux.HandleFunc("/login", r.loginHandler)
 	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler)
-	r.mux.HandleFunc("/api/v1/login", r.loginHandler)
-}
+	r.mux.HandleFunc("/health", r.healthHandler)
 
-// rootHandler lists all available API endpoints
-func (r *Router) rootHandler(w http.ResponseWriter, req *http.Request) {
-	http.ServeFile(w, req, "./frontend/index.html")
+	// Static frontend routes after API
+	fs := http.FileServer(http.Dir("./frontend"))
+	r.mux.Handle("/", fs)
 }
 
 // healthHandler handles health check requests
@@ -52,16 +51,17 @@ func (r *Router) healthHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// timeEntriesHandler returns all time entries
 func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 
+	w.Header().Set("Content-Type", "application/json")
 	var entries []domain.TimeEntry
+
 	if result := r.db.Find(&entries); result.Error != nil {
 		http.Error(w, "Database query failed", http.StatusInternalServerError)
 		r.logger.Error("DB query error: " + result.Error.Error())
 		return
 	}
+
 	if err := json.NewEncoder(w).Encode(entries); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		r.logger.Error("JSON encode error: " + err.Error())
@@ -85,14 +85,12 @@ func (r *Router) loginHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Only accept "worker" or "manager"
 	if payload.Role != "worker" && payload.Role != "manager" {
 		http.Error(w, "Invalid role", http.StatusBadRequest)
 		return
 	}
 
-	// Respond with success and role (for now no password/auth)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"role":    payload.Role,
 	})
