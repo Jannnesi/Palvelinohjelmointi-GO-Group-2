@@ -11,30 +11,22 @@
 <script>
 async function loadEntries() {
   const res = await fetch("/timeentries");
-  const entries = await res.json();
-  document.getElementById("entries").innerHTML =
-    entries.map(e => `<div>${e.task} - ${e.hours}h</div>`).join("");
+  const data = await res.json();
+
+  console.log("Loaded entries:", data);
+
+  const list = document.getElementById("entries");
+  list.innerHTML = "";
+
+  data.forEach(entry => {
+    const item = document.createElement("li");
+    item.textContent = `${entry.Description} (${entry.StartTime} - ${entry.EndTime})`;
+    list.appendChild(item);
+  });
 }
 
-document.getElementById("entryForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const task = document.getElementById("task").value;
-  const hours = parseFloat(document.getElementById("hours").value);
-
-  const res = await fetch("/timeentries", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ task, hours })
-  });
-
-  if (res.ok) {
-    alert("Time entry added!");
-    loadEntries();
-    e.target.reset();
-  } else {
-    alert("Failed to add entry");
-  }
-});
-
-loadEntries();
+window.loadEntries();
 </script>
+
+
+<ul id="entries"></ul>
