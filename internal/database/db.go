@@ -22,4 +22,15 @@ func Connect() *gorm.DB {
 
 	log.Println("✅ Database connected and migrated.")
 	return db
+
+}
+
+func GetEntries(db *gorm.DB) ([]domain.TimeEntry, error) {
+	var entries []domain.TimeEntry
+	result := db.Find(&entries)
+	return entries, result.Error
+}
+
+func AddEntry(db *gorm.DB, entry domain.TimeEntry) error {
+	return db.Create(&entry).Error
 }

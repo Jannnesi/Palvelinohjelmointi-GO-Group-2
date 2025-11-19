@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+    button { padding: 15px 30px; margin: 20px; font-size: 18px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Welcome to the Time Tracker</h1>
+  <button id="workerBtn">Login as Worker</button>
+  <button id="managerBtn">Login as Manager</button>
+
+  <script>
+
+    async function login(role) {
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        if (role === "worker") {
+          window.location.href = "/frontend/workerdashboard.html";
+        } else if (role === "manager") {
+          window.location.href = "/frontend/managerdashboard.html";
+        }
+      } else {
+        alert("Login failed");
+      }
+    }
+
+    document.getElementById("workerBtn").addEventListener("click", () => login("worker"));
+    document.getElementById("managerBtn").addEventListener("click", () => login("manager"));
+  </script>
+</body>
+</html>
