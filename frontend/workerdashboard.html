@@ -1,0 +1,32 @@
+<h1>Worker Dashboard</h1>
+
+<form id="entryForm">
+  <input type="text" id="task" placeholder="Task description" required>
+  <input type="number" id="hours" step="0.25" placeholder="Hours worked" required>
+  <button type="submit">Add Entry</button>
+</form>
+
+<div id="entries"></div>
+
+<script>
+async function loadEntries() {
+  const res = await fetch("/timeentries");
+  const data = await res.json();
+
+  console.log("Loaded entries:", data);
+
+  const list = document.getElementById("entries");
+  list.innerHTML = "";
+
+  data.forEach(entry => {
+    const item = document.createElement("li");
+    item.textContent = `${entry.Description} (${entry.StartTime} - ${entry.EndTime})`;
+    list.appendChild(item);
+  });
+}
+
+window.loadEntries();
+</script>
+
+
+<ul id="entries"></ul>

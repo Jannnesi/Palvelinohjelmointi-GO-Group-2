@@ -53,10 +53,19 @@ func (r *Router) rootHandler(w http.ResponseWriter, req *http.Request) {
 		"PUT /timeentries/{id}":    "Update an existing time entry",
 		"DELETE /timeentries/{id}": "Remove a time entry",
 	}
+	// Serve index page at /
+	r.mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		http.ServeFile(w, req, "./frontend/index.html")
+	})
 
-	if err := json.NewEncoder(w).Encode(endpoints); err != nil {
-		r.logger.Error("Failed to encode endpoints response: " + err.Error())
-	}
+	// API endpoints
+	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler)
+	r.mux.HandleFunc("/health", r.healthHandler)
+	r.mux.HandleFunc("/login", r.loginHandler)
+
+	// Serve all other frontend files (dashboard, JS, CSS)
+	fs := http.FileServer(http.Dir("./frontend"))
+	r.mux.Handle("/frontend/", http.StripPrefix("/frontend/", fs))
 }
 
 // healthHandler handles health check requests
@@ -86,13 +95,17 @@ func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
 // listTimeEntries returns all time entries
 func (r *Router) listTimeEntries(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
+func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
 
+	w.Header().Set("Content-Type", "application/json")
 	var entries []domain.TimeEntry
+
 	if result := r.db.Find(&entries); result.Error != nil {
 		http.Error(w, "Database query failed", http.StatusInternalServerError)
 		r.logger.Error("DB query error: " + result.Error.Error())
 		return
 	}
+
 	if err := json.NewEncoder(w).Encode(entries); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		r.logger.Error("JSON encode error: " + err.Error())
@@ -227,6 +240,32 @@ func (r *Router) deleteTimeEntry(w http.ResponseWriter, id uint) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+func (r *Router) loginHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var payload struct {
+		Role string `json:"role"`
+	}
+
+	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if payload.Role != "worker" && payload.Role != "manager" {
+		http.Error(w, "Invalid role", http.StatusBadRequest)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"role":    payload.Role,
+	})
 }
 
 // ServeHTTP implements http.Handler interface
