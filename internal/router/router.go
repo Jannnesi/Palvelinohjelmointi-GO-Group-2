@@ -1,11 +1,11 @@
 package router
 
 import (
-	"encoding/json" 
+	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"		
-	"strings"		
+	"strconv"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -14,29 +14,33 @@ import (
 )
 
 // Router handles HTTP routing
-type Router struct { // Define the Router struct
-	mux    *http.ServeMux // HTTP request multiplexer
-	logger *logger.Logger // Logger for logging messages
-	db     *gorm.DB       // Database connection
+type Router struct {
+	mux    *http.ServeMux
+	logger *logger.Logger
+	db     *gorm.DB
 }
 
 // New creates a new router instance
-func New(log *logger.Logger, db *gorm.DB) *Router { // Initialize the router
-	r := &Router{ 				// Create a new Router instance
-		mux:    http.NewServeMux(), // Initialize the HTTP request multiplexer
-		logger: log,		 	// Assign the provided logger
-		db:     db,			// Assign the provided database connection
+func New(log *logger.Logger, db *gorm.DB) *Router {
+	r := &Router{
+		mux:    http.NewServeMux(),
+		logger: log,
+		db:     db,
 	}
-	r.setupRoutes()		// Set up the application routes
+	r.setupRoutes()
 	return r
 }
 
 // setupRoutes configures all application routes
 func (r *Router) setupRoutes() {
-	r.mux.HandleFunc("/", r.rootHandler)                   // List available endpoints
-	r.mux.HandleFunc("/health", r.healthHandler)           // Health check endpoint
-	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler) // GET/POST
-	r.mux.HandleFunc("/timeentries/", r.timeEntryByIDHandler) // GET/PUT/DELETE by ID
+	r.mux.HandleFunc("/", r.rootHandler)
+	r.mux.HandleFunc("/health", r.healthHandler)
+	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler)
+	r.mux.HandleFunc("/timeentries/", r.timeEntryByIDHandler)
+	r.mux.HandleFunc("/login", r.loginHandler)
+
+	fs := http.FileServer(http.Dir("./frontend"))
+	r.mux.Handle("/frontend/", http.StripPrefix("/frontend/", fs))
 }
 
 // rootHandler lists all available API endpoints
@@ -52,24 +56,16 @@ func (r *Router) rootHandler(w http.ResponseWriter, req *http.Request) {
 		"GET /timeentries/{id}":    "Get a single time entry",
 		"PUT /timeentries/{id}":    "Update an existing time entry",
 		"DELETE /timeentries/{id}": "Remove a time entry",
+		"POST /login":              "Mock login for selecting worker/manager role",
 	}
-	// Serve index page at /
-	r.mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		http.ServeFile(w, req, "./frontend/index.html")
-	})
 
-	// API endpoints
-	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler)
-	r.mux.HandleFunc("/health", r.healthHandler)
-	r.mux.HandleFunc("/login", r.loginHandler)
-
-	// Serve all other frontend files (dashboard, JS, CSS)
-	fs := http.FileServer(http.Dir("./frontend"))
-	r.mux.Handle("/frontend/", http.StripPrefix("/frontend/", fs))
+	if err := json.NewEncoder(w).Encode(endpoints); err != nil {
+		r.logger.Error("Failed to encode endpoints response: " + err.Error())
+	}
 }
 
 // healthHandler handles health check requests
-func (r *Router) healthHandler(w http.ResponseWriter, req *http.Request) { // Health check endpoint
+func (r *Router) healthHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{
@@ -79,9 +75,8 @@ func (r *Router) healthHandler(w http.ResponseWriter, req *http.Request) { // He
 	}
 }
 
-// timeEntriesHandler routes list/create operations based on the HTTP method
+// timeEntriesHandler routes list/create operations
 func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
-	// Fan out to the correct CRUD helper based on the HTTP verb
 	switch req.Method {
 	case http.MethodGet:
 		r.listTimeEntries(w)
@@ -92,27 +87,21 @@ func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// listTimeEntries returns all time entries
 func (r *Router) listTimeEntries(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
-func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
 
-	w.Header().Set("Content-Type", "application/json")
 	var entries []domain.TimeEntry
-
 	if result := r.db.Find(&entries); result.Error != nil {
 		http.Error(w, "Database query failed", http.StatusInternalServerError)
 		r.logger.Error("DB query error: " + result.Error.Error())
 		return
 	}
-
 	if err := json.NewEncoder(w).Encode(entries); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		r.logger.Error("JSON encode error: " + err.Error())
 	}
 }
 
-// createTimeEntry creates a new time entry
 func (r *Router) createTimeEntry(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -134,9 +123,8 @@ func (r *Router) createTimeEntry(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// timeEntryByIDHandler handles GET, PUT, DELETE for a specific time entry by ID
+// timeEntryByIDHandler handles GET, PUT, DELETE for a specific time entry
 func (r *Router) timeEntryByIDHandler(w http.ResponseWriter, req *http.Request) {
-	// Strip the prefix manually because we're on the default mux (no path params)
 	idStr := strings.TrimPrefix(req.URL.Path, "/timeentries/")
 	if idStr == "" {
 		http.Error(w, "Time entry ID is required", http.StatusBadRequest)
@@ -161,7 +149,6 @@ func (r *Router) timeEntryByIDHandler(w http.ResponseWriter, req *http.Request) 
 	}
 }
 
-// getTimeEntryByID returns a single time entry
 func (r *Router) getTimeEntryByID(w http.ResponseWriter, id uint) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -182,7 +169,6 @@ func (r *Router) getTimeEntryByID(w http.ResponseWriter, id uint) {
 	}
 }
 
-// updateTimeEntry updates an existing time entry by ID
 func (r *Router) updateTimeEntry(w http.ResponseWriter, req *http.Request, id uint) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -193,7 +179,6 @@ func (r *Router) updateTimeEntry(w http.ResponseWriter, req *http.Request, id ui
 		return
 	}
 
-	// Fetch existing row to ensure we 404 correctly and retain missing fields
 	var existing domain.TimeEntry
 	if err := r.db.First(&existing, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -224,7 +209,6 @@ func (r *Router) updateTimeEntry(w http.ResponseWriter, req *http.Request, id ui
 	}
 }
 
-// deleteTimeEntry removes a time entry by ID
 func (r *Router) deleteTimeEntry(w http.ResponseWriter, id uint) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -240,6 +224,8 @@ func (r *Router) deleteTimeEntry(w http.ResponseWriter, id uint) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
 func (r *Router) loginHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -262,10 +248,12 @@ func (r *Router) loginHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"role":    payload.Role,
-	})
+	}); err != nil {
+		r.logger.Error("JSON encode error: " + err.Error())
+	}
 }
 
 // ServeHTTP implements http.Handler interface
