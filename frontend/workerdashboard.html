@@ -15,8 +15,10 @@
 
     <!-- Entry form -->
     <form id="entryForm" class="entry-row">
+      <input type="text" id="project" placeholder="Project (optional)">
       <input type="text" id="task" placeholder="Task description" required>
       <input type="number" id="hours" step="0.25" placeholder="Hours worked" required>
+      <input type="date" id="date" placeholder="Date" required>
       <button type="submit">Add Entry</button>
     </form>
 
@@ -37,7 +39,7 @@
 
     function formatDate(dateStr) {
       const d = new Date(dateStr);
-      return d.toLocaleString();
+      return d.toLocaleDateString();
     }
 
     function getHours(start, end) {
@@ -56,7 +58,7 @@
 
       let html = `
         <table>
-          <tr><th>Description</th><th>Start</th><th>End</th><th>Hours</th></tr>
+          <tr><th>Date</th><th>Project</th><th>Description</th><th>Hours</th></tr>
       `;
 
       let totalHours = 0;
@@ -67,9 +69,9 @@
 
         html += `
           <tr>
-            <td>${e.Description}</td>
             <td>${formatDate(e.StartTime)}</td>
-            <td>${formatDate(e.EndTime)}</td>
+            <td>${e.Project || ""}</td>
+            <td>${e.Description}</td>
             <td>${h.toFixed(2)}</td>
           </tr>
         `;
@@ -86,31 +88,54 @@
       entriesDiv.innerHTML = html;
     }
 
+    // Default date input to current day (YYYY-MM-DD)
+    const dateInput = document.getElementById("date");
+    dateInput.value = new Date().toISOString().split("T")[0];
+
     // Handle form submission
     document.getElementById("entryForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
+      const dateStr = dateInput.value;
+      const project = document.getElementById("project").value;
       const description = document.getElementById("task").value;
       const hours = parseFloat(document.getElementById("hours").value);
 
-      const now = new Date();
-      const end = new Date(now.getTime() + hours * 3600 * 1000);
+      if (isNaN(hours) || hours <= 0) {
+        alert("Hours must be greater than zero.");
+        return;
+      }
 
+      const start = new Date(`${dateStr}T00:00:00`);
+      if (isNaN(start.getTime())) {
+        alert("Please provide a valid date.");
+        return;
+      }
+      const end = new Date(start.getTime() + hours * 3600 * 1000);
+
+      // Create entry object (payload)
       const entry = {
         Description: description,
-        StartTime: now.toISOString(),
+        Project: project,
+        StartTime: start.toISOString(),
         EndTime: end.toISOString()
       };
 
-      await fetch("/timeentries", {
+      // Send POST request to add entry
+      const res = await fetch("/timeentries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry)
       });
 
-      document.getElementById("task").value = "";
-      document.getElementById("hours").value = "";
+      if (!res.ok) { // Error handling
+        alert("Failed to add entry");
+        return;
+      }
 
+      e.target.reset(); // Clear form
+      dateInput.value = new Date().toISOString().split("T")[0]; // Reset date back to today
+      
       loadEntries();
     });
 

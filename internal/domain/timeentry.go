@@ -6,6 +6,7 @@ import "time"
 type TimeEntry struct {
 	ID          uint `gorm:"primaryKey"`
 	UserID      uint
+	Project     string
 	Description string
 	StartTime   time.Time
 	EndTime     time.Time

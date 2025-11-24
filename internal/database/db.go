@@ -28,6 +28,7 @@ func Connect() *gorm.DB {
 		// Drop in a single entry so the UI has data on fresh installs
 		seed := domain.TimeEntry{
 			UserID:      1,
+			Project:     "Demo project",
 			Description: "Hardcoded test entry",
 			StartTime:   time.Now().Add(-2 * time.Hour),
 			EndTime:     time.Now(),
