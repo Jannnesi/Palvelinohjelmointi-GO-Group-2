@@ -1,3 +1,140 @@
-<h1>Manager Dashboard</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Manager Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
 
-<p>empty :(</p>
+<body>
+  <div class="container">
+
+    <button onclick="window.location.href='/frontend/'" class="back-btn">← Back</button>
+
+    <h1>Manager Dashboard</h1>
+
+    <h2>Today's Entries</h2>
+    <div id="daily"></div>
+
+    <h2>This Week Summary</h2>
+    <div id="weekly"></div>
+
+  </div>
+
+  <script>
+    async function loadEntries() {
+      const res = await fetch("/timeentries");
+      const entries = await res.json();
+
+      renderDaily(entries);
+      renderWeekly(entries);
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleString(); 
+    }
+
+    function getHours(start, end) {
+      const s = new Date(start);
+      const e = new Date(end);
+      return (e - s) / 1000 / 3600;
+    }
+
+    // --- DAILY VIEW ---
+    function renderDaily(entries) {
+      const dailyDiv = document.getElementById("daily");
+      const today = new Date().toISOString().slice(0, 10);
+
+      const todaysEntries = entries.filter(e =>
+        e.StartTime.slice(0, 10) === today
+      );
+
+      if (todaysEntries.length === 0) {
+        dailyDiv.innerHTML = "<p>No entries today</p>";
+        return;
+      }
+
+      let totalHours = 0;
+      let html = `
+        <table>
+          <tr><th>Description</th><th>Start</th><th>End</th><th>Hours</th></tr>
+      `;
+
+      todaysEntries.forEach(e => {
+        const h = getHours(e.StartTime, e.EndTime);
+        totalHours += h;
+
+        html += `
+          <tr>
+            <td>${e.Description}</td>
+            <td>${formatDate(e.StartTime)}</td>
+            <td>${formatDate(e.EndTime)}</td>
+            <td>${h.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+
+      html += "</table>";
+
+      html += `
+        <div class="summary-box">
+          <strong>Total hours today:</strong> ${totalHours.toFixed(2)}
+        </div>
+      `;
+
+      dailyDiv.innerHTML = html;
+    }
+
+    // --- WEEKLY VIEW ---
+    function renderWeekly(entries) {
+      const weeklyDiv = document.getElementById("weekly");
+
+      const week = {};
+      const today = new Date();
+      const monday = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const key = d.toISOString().slice(0, 10);
+        week[key] = 0;
+      }
+
+      entries.forEach(e => {
+        const date = e.StartTime.slice(0, 10);
+        if (week.hasOwnProperty(date)) {
+          week[date] += getHours(e.StartTime, e.EndTime);
+        }
+      });
+
+      let totalWeekHours = 0;
+      let html = "<table><tr><th>Date</th><th>Hours</th></tr>";
+
+      for (let date in week) {
+        html += `
+          <tr>
+            <td>${date}</td>
+            <td>${week[date].toFixed(2)}</td>
+          </tr>
+        `;
+        totalWeekHours += week[date];
+      }
+
+      html += "</table>";
+
+      html += `
+        <div class="summary-box">
+          <strong>Total hours this week:</strong> ${totalWeekHours.toFixed(2)}
+        </div>
+      `;
+
+      weeklyDiv.innerHTML = html;
+    }
+
+    loadEntries();
+  </script>
+
+</body>
+</html>
+
