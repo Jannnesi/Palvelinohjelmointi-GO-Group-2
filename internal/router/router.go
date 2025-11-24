@@ -9,8 +9,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/domain"
-	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/logger"
+	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/domain" // import domain models package, which
+	//  defines data structures used in the application
+	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/logger" // import custom logger package, which
+	//  provides logging functionality
 )
 
 // Router handles HTTP routing
@@ -87,6 +89,7 @@ func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// listTimeEntries handles GET /timeentries
 func (r *Router) listTimeEntries(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -102,6 +105,7 @@ func (r *Router) listTimeEntries(w http.ResponseWriter) {
 	}
 }
 
+// createTimeEntry handles POST /timeentries
 func (r *Router) createTimeEntry(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -149,6 +153,7 @@ func (r *Router) timeEntryByIDHandler(w http.ResponseWriter, req *http.Request) 
 	}
 }
 
+// getTimeEntryByID handles GET /timeentries/{id}
 func (r *Router) getTimeEntryByID(w http.ResponseWriter, id uint) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -169,6 +174,7 @@ func (r *Router) getTimeEntryByID(w http.ResponseWriter, id uint) {
 	}
 }
 
+// updateTimeEntry handles PUT /timeentries/{id}
 func (r *Router) updateTimeEntry(w http.ResponseWriter, req *http.Request, id uint) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -209,6 +215,7 @@ func (r *Router) updateTimeEntry(w http.ResponseWriter, req *http.Request, id ui
 	}
 }
 
+// deleteTimeEntry handles DELETE /timeentries/{id}
 func (r *Router) deleteTimeEntry(w http.ResponseWriter, id uint) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -226,6 +233,7 @@ func (r *Router) deleteTimeEntry(w http.ResponseWriter, id uint) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// loginHandler handles POST /login
 func (r *Router) loginHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
