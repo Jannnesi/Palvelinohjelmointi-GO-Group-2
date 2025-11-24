@@ -15,6 +15,7 @@
 
     <!-- Entry form -->
     <form id="entryForm" class="entry-row">
+      <input type="text" id="project" placeholder="Project (optional)">
       <input type="text" id="task" placeholder="Task description" required>
       <input type="number" id="hours" step="0.25" placeholder="Hours worked" required>
       <input type="date" id="date" placeholder="Date" required>
@@ -57,7 +58,7 @@
 
       let html = `
         <table>
-          <tr><th>Date</th><th>Description</th><th>Hours</th></tr>
+          <tr><th>Date</th><th>Project</th><th>Description</th><th>Hours</th></tr>
       `;
 
       let totalHours = 0;
@@ -69,6 +70,7 @@
         html += `
           <tr>
             <td>${formatDate(e.StartTime)}</td>
+            <td>${e.Project || ""}</td>
             <td>${e.Description}</td>
             <td>${h.toFixed(2)}</td>
           </tr>
@@ -95,6 +97,7 @@
       e.preventDefault();
 
       const dateStr = dateInput.value;
+      const project = document.getElementById("project").value;
       const description = document.getElementById("task").value;
       const hours = parseFloat(document.getElementById("hours").value);
 
@@ -113,6 +116,7 @@
       // Create entry object (payload)
       const entry = {
         Description: description,
+        Project: project,
         StartTime: start.toISOString(),
         EndTime: end.toISOString()
       };
