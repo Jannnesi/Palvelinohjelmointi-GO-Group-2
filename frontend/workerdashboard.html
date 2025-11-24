@@ -1,32 +1,121 @@
-<h1>Worker Dashboard</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Worker Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
 
-<form id="entryForm">
-  <input type="text" id="task" placeholder="Task description" required>
-  <input type="number" id="hours" step="0.25" placeholder="Hours worked" required>
-  <button type="submit">Add Entry</button>
-</form>
+<body>
+  <div class="container">
 
-<div id="entries"></div>
+    <button onclick="window.location.href='/frontend/'" class="back-btn">← Back</button>
 
-<script>
-async function loadEntries() {
-  const res = await fetch("/timeentries");
-  const data = await res.json();
+    <h1>Worker Dashboard</h1>
 
-  console.log("Loaded entries:", data);
+    <!-- Entry form -->
+    <form id="entryForm" class="entry-row">
+      <input type="text" id="task" placeholder="Task description" required>
+      <input type="number" id="hours" step="0.25" placeholder="Hours worked" required>
+      <button type="submit">Add Entry</button>
+    </form>
 
-  const list = document.getElementById("entries");
-  list.innerHTML = "";
+    <h2>Your Time Entries</h2>
 
-  data.forEach(entry => {
-    const item = document.createElement("li");
-    item.textContent = `${entry.Description} (${entry.StartTime} - ${entry.EndTime})`;
-    list.appendChild(item);
-  });
-}
+    <!-- Daily entries table -->
+    <div id="entries"></div>
 
-window.loadEntries();
-</script>
+  </div>
 
+  <script>
+    async function loadEntries() {
+      const res = await fetch("/timeentries");
+      const data = await res.json();
 
-<ul id="entries"></ul>
+      renderEntries(data);
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleString();
+    }
+
+    function getHours(start, end) {
+      const s = new Date(start);
+      const e = new Date(end);
+      return (e - s) / 1000 / 3600;
+    }
+
+    function renderEntries(entries) {
+      const entriesDiv = document.getElementById("entries");
+
+      if (entries.length === 0) {
+        entriesDiv.innerHTML = "<p>No entries yet.</p>";
+        return;
+      }
+
+      let html = `
+        <table>
+          <tr><th>Description</th><th>Start</th><th>End</th><th>Hours</th></tr>
+      `;
+
+      let totalHours = 0;
+
+      entries.forEach(e => {
+        const h = getHours(e.StartTime, e.EndTime);
+        totalHours += h;
+
+        html += `
+          <tr>
+            <td>${e.Description}</td>
+            <td>${formatDate(e.StartTime)}</td>
+            <td>${formatDate(e.EndTime)}</td>
+            <td>${h.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+
+      html += "</table>";
+
+      html += `
+        <div class="summary-box">
+          <strong>Total hours recorded:</strong> ${totalHours.toFixed(2)}
+        </div>
+      `;
+
+      entriesDiv.innerHTML = html;
+    }
+
+    // Handle form submission
+    document.getElementById("entryForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const description = document.getElementById("task").value;
+      const hours = parseFloat(document.getElementById("hours").value);
+
+      const now = new Date();
+      const end = new Date(now.getTime() + hours * 3600 * 1000);
+
+      const entry = {
+        Description: description,
+        StartTime: now.toISOString(),
+        EndTime: end.toISOString()
+      };
+
+      await fetch("/timeentries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      });
+
+      document.getElementById("task").value = "";
+      document.getElementById("hours").value = "";
+
+      loadEntries();
+    });
+
+    loadEntries();
+  </script>
+
+</body>
+</html>
