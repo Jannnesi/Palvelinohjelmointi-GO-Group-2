@@ -3,7 +3,8 @@
 Time-tracking example for SeAMK’s service programming course. The app shows how to build a Go HTTP API backed by SQLite via GORM, serve a simple frontend, and package everything with Docker.
 
 ## Features
-- RESTful JSON endpoints for `/timeentries`, plus `/health` and a mock `/login`.
+- Gin-powered RESTful JSON endpoints for `/timeentries`, plus `/health` and a mock `/login`.
+- Built-in Gin middleware (logging, recovery) and static serving for `frontend/`.
 - SQLite relational database (`worklogger.db`) auto-migrated and seeded at startup.
 - GORM domain models (`internal/domain/*.go`) for ORM access without raw SQL.
 - Static worker dashboard (`frontend/workerdashboard.html`) that consumes the API.
@@ -11,9 +12,10 @@ Time-tracking example for SeAMK’s service programming course. The app shows ho
 
 ## Tech Stack
 - Go 1.22+ (module `github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2`)
+- Gin (`github.com/gin-gonic/gin`) for HTTP routing, grouping, and middleware.
 - GORM ORM with `github.com/glebarez/sqlite`
 - SQLite (file-based) database
-- Vanilla HTML/CSS/JS frontend served by `net/http`
+- Vanilla HTML/CSS/JS frontend served via Gin's `Static` helper
 - Docker multi-stage build
 
 ## Repo Layout
@@ -44,6 +46,24 @@ go run ./cmd/server
 # open http://localhost:8080/frontend/workerdashboard.html
 ```
 `internal/database.Connect()` auto-migrates schemas and seeds a sample entry, so no manual SQL prep is required.
+
+## Gin Router Overview
+`internal/router/router.go` wires the HTTP surface using Gin. `gin.Default()` enables request logging and panic recovery, while `engine.Static("/frontend", "./frontend")` serves the dashboard assets.
+
+The time-entry REST API is built with a Gin route group so that middleware and URL prefixes are applied consistently:
+
+```go
+api := r.engine.Group("/timeentries")
+{
+    api.GET("", r.listTimeEntries)
+    api.POST("", r.createTimeEntry)
+    api.GET("/:id", r.getTimeEntryByID)
+    api.PUT("/:id", r.updateTimeEntry)
+    api.DELETE("/:id", r.deleteTimeEntry)
+}
+```
+
+Handlers receive a `*gin.Context`, making it simple to read path params, bind JSON (`ShouldBindJSON`), and write JSON responses (`c.JSON`). Add new routes by creating another group (e.g., `/projects`) or registering directly on `r.engine`.
 
 ## API Summary
 | Method | Path                | Purpose                          |

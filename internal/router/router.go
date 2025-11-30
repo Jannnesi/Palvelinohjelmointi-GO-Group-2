@@ -1,23 +1,19 @@
 package router
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
-	"strings"
 
+	"github.com/gin-gonic/gin" // Gin importattu
 	"gorm.io/gorm"
 
-	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/domain" // import domain models package, which
-	//  defines data structures used in the application
-	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/logger" // import custom logger package, which
-	//  provides logging functionality
+	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/domain"
+	"github.com/Jannnesi/Palvelinohjelmointi-GO-Group-2/internal/logger"
 )
 
-// Router handles HTTP routing
+// Router käyttää nyt Ginin Engineä standardikirjaston Muxin sijaan
 type Router struct {
-	mux    *http.ServeMux
+	engine *gin.Engine
 	logger *logger.Logger
 	db     *gorm.DB
 }
@@ -25,7 +21,7 @@ type Router struct {
 // New creates a new router instance
 func New(log *logger.Logger, db *gorm.DB) *Router {
 	r := &Router{
-		mux:    http.NewServeMux(),
+		engine: gin.Default(), // Default sisältää valmiiksi loggerin ja recovery-middlewaren
 		logger: log,
 		db:     db,
 	}
@@ -35,236 +31,177 @@ func New(log *logger.Logger, db *gorm.DB) *Router {
 
 // setupRoutes configures all application routes
 func (r *Router) setupRoutes() {
-	r.mux.HandleFunc("/", r.rootHandler)
-	r.mux.HandleFunc("/health", r.healthHandler)
-	r.mux.HandleFunc("/timeentries", r.timeEntriesHandler)
-	r.mux.HandleFunc("/timeentries/", r.timeEntryByIDHandler)
-	r.mux.HandleFunc("/login", r.loginHandler)
+	// Staattiset tiedostot on Ginissä todella helppoja
+	r.engine.Static("/frontend", "./frontend")
 
-	fs := http.FileServer(http.Dir("./frontend"))
-	r.mux.Handle("/frontend/", http.StripPrefix("/frontend/", fs))
+	// Perusreitit
+	r.engine.GET("/", r.rootHandler)
+	r.engine.GET("/health", r.healthHandler)
+	r.engine.POST("/login", r.loginHandler)
+
+	// Ryhmitellään timeentries-reitit (API Group)
+	// Tämä selkeyttää koodia
+	api := r.engine.Group("/timeentries")
+	{
+		api.GET("", r.listTimeEntries)
+		api.POST("", r.createTimeEntry)
+		api.GET("/:id", r.getTimeEntryByID)    // Huomaa :id notaatio
+		api.PUT("/:id", r.updateTimeEntry)     // Huomaa :id notaatio
+		api.DELETE("/:id", r.deleteTimeEntry)  // Huomaa :id notaatio
+	}
 }
 
-// rootHandler lists all available API endpoints
-func (r *Router) rootHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+// ServeHTTP tarvitaan, jotta palvelin voidaan käynnistää main.go:ssa
+// (Gin engine toteuttaa http.Handler-rajapinnan)
+func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	r.engine.ServeHTTP(w, req)
+}
 
+// --- HANDLERS ---
+
+func (r *Router) rootHandler(c *gin.Context) {
 	endpoints := map[string]string{
-		"GET /":                    "List all available API endpoints",
-		"GET /health":              "Check service health",
-		"GET /timeentries":         "Get all time entries",
-		"POST /timeentries":        "Create a new time entry",
-		"GET /timeentries/{id}":    "Get a single time entry",
-		"PUT /timeentries/{id}":    "Update an existing time entry",
-		"DELETE /timeentries/{id}": "Remove a time entry",
-		"POST /login":              "Mock login for selecting worker/manager role",
+		"GET /":                  "List all available API endpoints",
+		"GET /health":            "Check service health",
+		"GET /timeentries":       "Get all time entries",
+		"POST /timeentries":      "Create a new time entry",
+		"GET /timeentries/:id":   "Get a single time entry",
+		"PUT /timeentries/:id":   "Update an existing time entry",
+		"DELETE /timeentries/:id": "Remove a time entry",
+		"POST /login":            "Mock login for selecting worker/manager role",
 	}
-
-	if err := json.NewEncoder(w).Encode(endpoints); err != nil {
-		r.logger.Error("Failed to encode endpoints response: " + err.Error())
-	}
+	// Gin hoitaa JSON-vastauksen ja otsikot automaattisesti
+	c.JSON(http.StatusOK, endpoints)
 }
 
-// healthHandler handles health check requests
-func (r *Router) healthHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-	}); err != nil {
-		r.logger.Error("Failed to encode health response: " + err.Error())
-	}
-}
-
-// timeEntriesHandler routes list/create operations
-func (r *Router) timeEntriesHandler(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodGet:
-		r.listTimeEntries(w)
-	case http.MethodPost:
-		r.createTimeEntry(w, req)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
+func (r *Router) healthHandler(c *gin.Context) {
+	// gin.H on lyhenne map[string]interface{}:lle
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // listTimeEntries handles GET /timeentries
-func (r *Router) listTimeEntries(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-
+func (r *Router) listTimeEntries(c *gin.Context) {
 	var entries []domain.TimeEntry
 	if result := r.db.Find(&entries); result.Error != nil {
-		http.Error(w, "Database query failed", http.StatusInternalServerError)
 		r.logger.Error("DB query error: " + result.Error.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
 		return
 	}
-	if err := json.NewEncoder(w).Encode(entries); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		r.logger.Error("JSON encode error: " + err.Error())
-	}
+	c.JSON(http.StatusOK, entries)
 }
 
 // createTimeEntry handles POST /timeentries
-func (r *Router) createTimeEntry(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
+func (r *Router) createTimeEntry(c *gin.Context) {
 	var entry domain.TimeEntry
-	if err := json.NewDecoder(req.Body).Decode(&entry); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		r.logger.Error("JSON decode error: " + err.Error())
+
+	// ShouldBindJSON lukee Bodyn ja tarkistaa onko se validia JSONia
+	if err := c.ShouldBindJSON(&entry); err != nil {
+		r.logger.Error("JSON bind error: " + err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	if result := r.db.Create(&entry); result.Error != nil {
-		http.Error(w, "Database insert failed", http.StatusInternalServerError)
 		r.logger.Error("DB insert error: " + result.Error.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database insert failed"})
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(entry); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		r.logger.Error("JSON encode error: " + err.Error())
-	}
+
+	c.JSON(http.StatusCreated, entry)
 }
 
-// timeEntryByIDHandler handles GET, PUT, DELETE for a specific time entry
-func (r *Router) timeEntryByIDHandler(w http.ResponseWriter, req *http.Request) {
-	idStr := strings.TrimPrefix(req.URL.Path, "/timeentries/")
-	if idStr == "" {
-		http.Error(w, "Time entry ID is required", http.StatusBadRequest)
-		return
-	}
-
-	entryID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid time entry ID", http.StatusBadRequest)
-		return
-	}
-
-	switch req.Method {
-	case http.MethodGet:
-		r.getTimeEntryByID(w, uint(entryID))
-	case http.MethodPut:
-		r.updateTimeEntry(w, req, uint(entryID))
-	case http.MethodDelete:
-		r.deleteTimeEntry(w, uint(entryID))
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// getTimeEntryByID handles GET /timeentries/{id}
-func (r *Router) getTimeEntryByID(w http.ResponseWriter, id uint) {
-	w.Header().Set("Content-Type", "application/json")
+// getTimeEntryByID handles GET /timeentries/:id
+func (r *Router) getTimeEntryByID(c *gin.Context) {
+	// Gin lukee parametrin suoraan URL:sta ":id"
+	id := c.Param("id") 
 
 	var entry domain.TimeEntry
-	if err := r.db.First(&entry, id).Error; err != nil {
+	if err := r.db.First(&entry, id).Error; err != nil { // GORM osaa käyttää string-ID:tä suoraan tai sen voi muuttaa intiksi
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Time entry not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Time entry not found"})
 		} else {
-			http.Error(w, "Database query failed", http.StatusInternalServerError)
+			r.logger.Error("DB query error: " + err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
 		}
-		r.logger.Error("DB query error: " + err.Error())
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(entry); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		r.logger.Error("JSON encode error: " + err.Error())
-	}
+	c.JSON(http.StatusOK, entry)
 }
 
-// updateTimeEntry handles PUT /timeentries/{id}
-func (r *Router) updateTimeEntry(w http.ResponseWriter, req *http.Request, id uint) {
-	w.Header().Set("Content-Type", "application/json")
+// updateTimeEntry handles PUT /timeentries/:id
+func (r *Router) updateTimeEntry(c *gin.Context) {
+	id := c.Param("id") // Saadaan ID URL:sta
 
 	var payload domain.TimeEntry
-	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		r.logger.Error("JSON decode error: " + err.Error())
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
 	var existing domain.TimeEntry
 	if err := r.db.First(&existing, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Time entry not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Time entry not found"})
 		} else {
-			http.Error(w, "Database query failed", http.StatusInternalServerError)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		}
-		r.logger.Error("DB query error: " + err.Error())
 		return
 	}
 
-	payload.ID = id
+	// Päivitetään tiedot
+	// payload.ID = existing.ID // Varmistetaan ettei ID muutu, jos structissa on ID
 	if err := r.db.Model(&existing).Updates(payload).Error; err != nil {
-		http.Error(w, "Database update failed", http.StatusInternalServerError)
 		r.logger.Error("DB update error: " + err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Update failed"})
 		return
 	}
 
-	if err := r.db.First(&existing, id).Error; err != nil {
-		http.Error(w, "Database query failed", http.StatusInternalServerError)
-		r.logger.Error("DB query error: " + err.Error())
-		return
-	}
+    // Haetaan päivitetty olio (valinnainen, mutta hyvä käytäntö palauttaa tuore data)
+    r.db.First(&existing, id)
 
-	if err := json.NewEncoder(w).Encode(existing); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		r.logger.Error("JSON encode error: " + err.Error())
-	}
+	c.JSON(http.StatusOK, existing)
 }
 
-// deleteTimeEntry handles DELETE /timeentries/{id}
-func (r *Router) deleteTimeEntry(w http.ResponseWriter, id uint) {
-	w.Header().Set("Content-Type", "application/json")
+// deleteTimeEntry handles DELETE /timeentries/:id
+func (r *Router) deleteTimeEntry(c *gin.Context) {
+	id := c.Param("id")
 
+	// Gormille voi antaa ID:n suoraan
 	result := r.db.Delete(&domain.TimeEntry{}, id)
+	
 	if result.Error != nil {
-		http.Error(w, "Database delete failed", http.StatusInternalServerError)
 		r.logger.Error("DB delete error: " + result.Error.Error())
-		return
-	}
-	if result.RowsAffected == 0 {
-		http.Error(w, "Time entry not found", http.StatusNotFound)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Delete failed"})
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Time entry not found"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 // loginHandler handles POST /login
-func (r *Router) loginHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
+func (r *Router) loginHandler(c *gin.Context) {
 	var payload struct {
-		Role string `json:"role"`
+		Role string `json:"role" binding:"required"` // Gin voi tarkistaa onko kenttä pakollinen
 	}
 
-	if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid body or missing role"})
 		return
 	}
 
 	if payload.Role != "worker" && payload.Role != "manager" {
-		http.Error(w, "Invalid role", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"role":    payload.Role,
-	}); err != nil {
-		r.logger.Error("JSON encode error: " + err.Error())
-	}
-}
-
-// ServeHTTP implements http.Handler interface
-func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	r.mux.ServeHTTP(w, req)
+	})
 }
