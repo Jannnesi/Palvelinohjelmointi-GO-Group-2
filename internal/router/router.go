@@ -82,11 +82,15 @@ func (r *Router) healthHandler(c *gin.Context) {
 // listTimeEntries handles GET /timeentries
 func (r *Router) listTimeEntries(c *gin.Context) {
 	var entries []domain.TimeEntry
-	if result := r.db.Find(&entries); result.Error != nil {
-		r.logger.Error("DB query error: " + result.Error.Error())
+	if err := r.db.
+		Preload("User").
+		Find(&entries).Error; err != nil {
+
+		r.logger.Error("DB query error: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
 		return
 	}
+
 	c.JSON(http.StatusOK, entries)
 }
 
