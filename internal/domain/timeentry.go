@@ -5,7 +5,7 @@ import "time"
 // TimeEntry represents a time tracking entry
 type TimeEntry struct {
 	ID          uint       `gorm:"primaryKey"`
-	UserID      uint       `json:"UserID" binding:"required" gorm:"foreignKey:UserID"`
+	UserID      uint       `json:"UserID" gorm:"foreignKey:UserID"`
 	User        User       `json:"User"`
 	Project     string     `json:"Project" binding:"required"`
 	Description string     `json:"Description" binding:"required"`
